@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ABACUS Web</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --accent: #2563eb;
+      --ok: #b7f7c2;
+      --bad: #ffb4b4;
+      --sel: #f5e48c;
+      --nbr: #d8efff;
+      --line: #d9dee8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: Arial, sans-serif; background: var(--bg); color: var(--text);
+    }
+    .wrap {
+      max-width: 980px; margin: 0 auto; padding: 16px;
+    }
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+      padding: 16px; box-shadow: 0 4px 20px rgba(0,0,0,.05);
+    }
+    h1 { margin: 0 0 12px; font-size: 28px; }
+    .topbar {
+      display: grid; grid-template-columns: repeat(4, 1fr) auto; gap: 10px; align-items: end;
+    }
+    label { display: block; font-size: 14px; margin-bottom: 6px; color: var(--muted); }
+    select, button, input {
+      width: 100%; padding: 10px 12px; font-size: 16px; border-radius: 10px;
+      border: 1px solid var(--line); background: white;
+    }
+    button.primary {
+      background: var(--accent); color: white; border-color: var(--accent); cursor: pointer;
+    }
+    button.secondary {
+      cursor: pointer;
+    }
+    .problem {
+      text-align: center; font-size: 34px; font-weight: bold; margin: 18px 0 8px;
+    }
+    .meta, .status, .help, .difficulty {
+      text-align: center; margin: 6px 0;
+    }
+    .meta { font-size: 18px; }
+    .status { min-height: 24px; color: #1e3a8a; font-weight: 600; }
+    .help { color: var(--muted); font-size: 14px; }
+    .difficulty { color: var(--muted); font-size: 13px; }
+    .timer { text-align: center; font-size: 18px; font-weight: bold; color: #c1121f; min-height: 28px; }
+    .grid {
+      display: grid; gap: 8px; justify-content: center; margin: 16px 0 14px;
+    }
+    .cell {
+      width: 72px; height: 72px; font-size: 28px; font-weight: bold; border-radius: 14px;
+      border: 1px solid #b7c2d0; background: white; cursor: pointer; touch-action: manipulation;
+    }
+    .cell.selected { background: var(--sel); }
+    .cell.neighbor { background: var(--nbr); }
+    .cell.correct { background: var(--ok); }
+    .cell.incorrect { background: var(--bad); }
+    .cell:disabled { opacity: .85; cursor: default; }
+    .row {
+      display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 10px;
+    }
+    .solutions {
+      margin-top: 12px; border-top: 1px solid var(--line); padding-top: 12px;
+    }
+    .solutions h3 { margin: 0 0 8px; font-size: 18px; }
+    .solutions ul { margin: 0; padding-left: 22px; }
+    .solutions li { margin: 4px 0; }
+    .settings {
+      margin-top: 16px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+    }
+    .settings .card h3 { margin-top: 0; }
+    .mini-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+    }
+    .checkbox { display: flex; align-items: center; gap: 8px; }
+    .checkbox input { width: auto; }
+    .footer-note {
+      margin-top: 14px; color: var(--muted); font-size: 13px; text-align: center;
+    }
+    @media (max-width: 800px) {
+      .topbar { grid-template-columns: 1fr 1fr; }
+      .settings { grid-template-columns: 1fr; }
+      .cell { width: 58px; height: 58px; font-size: 24px; }
+      .problem { font-size: 28px; }
+    }
+  </style>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>ABACUS Web</h1>
+      <div class="topbar">
+        <div>
+          <label for="difficulty">Moeilijkheid</label>
+          <select id="difficulty"></select>
+        </div>
+        <div>
+          <label for="operation">Operatie</label>
+          <select id="operation"></select>
+        </div>
+        <div>
+          <label for="mode">Spelmodus</label>
+          <select id="mode"></select>
+        </div>
+        <div>
+          <label for="soundEnabled">Geluid</label>
+          <select id="soundEnabled">
+            <option value="true">Aan</option>
+            <option value="false">Uit</option>
+          </select>
+        </div>
+        <div>
+          <button class="primary" id="newGameBtn">Nieuw spel</button>
+        </div>
+      </div>
+
+      <div class="problem" id="problemText">x + y = ?</div>
+      <div class="meta" id="scoreText">Score: 0</div>
+      <div class="meta" id="statsText">Fouten: 0 | Opgaven: 0</div>
+      <div class="timer" id="timerText"></div>
+      <div class="status" id="statusText">Kies twee aangrenzende getallen.</div>
+
+      <div class="grid" id="grid"></div>
+
+      <div class="help">
+        Regel: kies twee verschillende aangrenzende getallen (ook diagonaal) die samen voldoen aan de opgave.
+        Bij delen telt het grootste getal gedeeld door het kleinste, met een geheel getal als uitkomst.
+      </div>
+      <div class="difficulty" id="difficultyInfo"></div>
+
+      <div class="solutions" id="solutionsBox" hidden>
+        <h3>Goede oplossingen</h3>
+        <div id="solutionsSummary"></div>
+        <ul id="solutionsList"></ul>
+      </div>
+    </div>
+
+    <div class="settings">
+      <div class="card">
+        <h3>Instellingen per moeilijkheid</h3>
+        <div class="mini-grid" id="difficultySettings"></div>
+      </div>
+      <div class="card">
+        <h3>Vrij spelen / modi</h3>
+        <div style="display:grid; gap:10px;">
+          <div>
+            <label for="problemLimit">Aantal opgaven in opgavenmodus</label>
+            <input id="problemLimit" type="number" min="1" max="200" />
+          </div>
+          <div>
+            <label for="timerSeconds">Speelduur in seconden</label>
+            <input id="timerSeconds" type="number" min="5" max="3600" />
+          </div>
+          <button class="secondary" id="saveSettingsBtn">Instellingen bewaren op dit apparaat</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-note">
+      Deze webversie draait lokaal in de browser en bewaart instellingen in localStorage.
+    
+    <div class="card" style="margin-top:16px;">
+      <h3>Gebruik op iPad</h3>
+
+      <h4>1. Het HTML-bestand openen op de iPad</h4>
+      <p><strong>Optie 1a – Direct openen:</strong></p>
+      <ol>
+        <li>Stuur het HTML-bestand naar jezelf (bijvoorbeeld via e-mail, AirDrop of WhatsApp).</li>
+        <li>Open het bestand op je iPad.</li>
+        <li>Tik op het bestand en kies <strong>‘Open met Safari’</strong> (of ‘Deel’ → Safari).</li>
+      </ol>
+
+      <p><strong>Optie 1b – Via iCloud Drive (aanbevolen):</strong></p>
+      <ol>
+        <li>Zet het HTML-bestand op iCloud Drive (via je computer).</li>
+        <li>Open op je iPad de app <strong>Bestanden</strong>.</li>
+        <li>Ga naar <strong>iCloud Drive</strong>.</li>
+        <li>Tik op het HTML-bestand.</li>
+        <li>Het bestand opent automatisch in Safari.</li>
+      </ol>
+
+      <h4>2. Maak er een app-icoon van (startscherm)</h4>
+      <ol>
+        <li>Zorg dat de webversie open staat in <strong>Safari</strong>.</li>
+        <li>Tik onderin op de <strong>deelknop</strong> (vierkant met pijltje omhoog).</li>
+        <li>Scroll naar beneden en kies <strong>‘Zet op beginscherm’</strong>.</li>
+        <li>Geef eventueel een naam (bijv. “Abacus”).</li>
+        <li>Tik op <strong>‘Voeg toe’</strong>.</li>
+      </ol>
+
+      <p>📱 Daarna verschijnt de app op je startscherm en kun je hem openen alsof het een echte app is.</p>
+    </div>
+
+  </div>
+
+<script>
+const DEFAULTS = {
+  Beginner: { gridSize: 4, minValue: 0, maxValue: 5, minSolutions: 2, maxSolutions: 3, operations: ["+","-"], showNeighborsOnFirstPick: true },
+  Basis: { gridSize: 5, minValue: 0, maxValue: 9, minSolutions: 2, maxSolutions: 4, operations: ["+","-","*"], showNeighborsOnFirstPick: true },
+  Gevorderd: { gridSize: 5, minValue: 0, maxValue: 9, minSolutions: 2, maxSolutions: 4, operations: ["+","-","*"], showNeighborsOnFirstPick: true },
+  Expert: { gridSize: 6, minValue: 0, maxValue: 9, minSolutions: 3, maxSolutions: 5, operations: ["+","-","*","/"], showNeighborsOnFirstPick: true },
+  FreePlay: { defaultProblemLimit: 10, defaultTimerSeconds: 60 },
+  Sound: { enabled: true }
+};
+
+const DIFFICULTY_INFO = {
+  Beginner: "BEGINNER | 4×4 | 0 t/m 5 | Operaties: + en − | Oplossingen via instellingen zichtbaar",
+  Basis: "BASIS | 5×5 | 0 t/m 9 | Operaties: +, − en ×",
+  Gevorderd: "GEVORDERD | 5×5 | 0 t/m 9 | Operaties: +, − en ×",
+  Expert: "EXPERT | 6×6 | 0 t/m 9 | Operaties: +, −, × en ÷"
+};
+
+function loadConfig() {
+  try {
+    const raw = localStorage.getItem("abacusWebConfig");
+    if (!raw) return structuredClone(DEFAULTS);
+    const saved = JSON.parse(raw);
+    return {
+      Beginner: {...DEFAULTS.Beginner, ...(saved.Beginner || {})},
+      Basis: {...DEFAULTS.Basis, ...(saved.Basis || {})},
+      Gevorderd: {...DEFAULTS.Gevorderd, ...(saved.Gevorderd || {})},
+      Expert: {...DEFAULTS.Expert, ...(saved.Expert || {})},
+      FreePlay: {...DEFAULTS.FreePlay, ...(saved.FreePlay || {})},
+      Sound: {...DEFAULTS.Sound, ...(saved.Sound || {})},
+    };
+  } catch {
+    return structuredClone(DEFAULTS);
+  }
+}
+
+function saveConfig() {
+  localStorage.setItem("abacusWebConfig", JSON.stringify(config));
+}
+
+let config = loadConfig();
+
+const state = {
+  score: 0,
+  errors: 0,
+  roundsPlayed: 0,
+  selectedCells: [],
+  currentProblem: null,
+  gridValues: [],
+  gameOver: false,
+  inputLocked: false,
+  timeLeft: null,
+  timerId: null,
+  wrongAttemptsCurrentRound: 0,
+  difficulty: "Basis",
+  operationChoice: "Wisselend",
+  mode: "Vrij spel",
+  settings: null
+};
+
+const el = {
+  difficulty: document.getElementById("difficulty"),
+  operation: document.getElementById("operation"),
+  mode: document.getElementById("mode"),
+  soundEnabled: document.getElementById("soundEnabled"),
+  newGameBtn: document.getElementById("newGameBtn"),
+  problemText: document.getElementById("problemText"),
+  scoreText: document.getElementById("scoreText"),
+  statsText: document.getElementById("statsText"),
+  timerText: document.getElementById("timerText"),
+  statusText: document.getElementById("statusText"),
+  grid: document.getElementById("grid"),
+  difficultyInfo: document.getElementById("difficultyInfo"),
+  solutionsBox: document.getElementById("solutionsBox"),
+  solutionsSummary: document.getElementById("solutionsSummary"),
+  solutionsList: document.getElementById("solutionsList"),
+  difficultySettings: document.getElementById("difficultySettings"),
+  problemLimit: document.getElementById("problemLimit"),
+  timerSeconds: document.getElementById("timerSeconds"),
+  saveSettingsBtn: document.getElementById("saveSettingsBtn")
+};
+
+function clone(obj) { return JSON.parse(JSON.stringify(obj)); }
+
+function playTone(freq=600, duration=120) {
+  if (String(config.Sound.enabled) !== "true" && config.Sound.enabled !== true) return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    gain.gain.setValueAtTime(0.001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration / 1000);
+    osc.start();
+    osc.stop(ctx.currentTime + duration / 1000);
+    osc.onended = () => ctx.close();
+  } catch {}
+}
+
+function playNewProblem() { playTone(900, 90); }
+function playError() { playTone(300, 150); setTimeout(() => playTone(240, 120), 90); }
+function playEndTimer() { playTone(700, 180); setTimeout(() => playTone(700, 180), 220); setTimeout(() => playTone(700, 250), 440); }
+function playMaxReached() { playTone(650, 120); setTimeout(() => playTone(850, 180), 140); }
+
+function allowedValue(problem, value, settings) {
+  if (value < settings.minValue || value > settings.maxValue) return false;
+  if ((problem.operation === "*" || problem.operation === "/") && value === 0) return false;
+  return true;
+}
+
+function isValidPair(problem, a, b) {
+  switch(problem.operation) {
+    case "+": return a + b === problem.target;
+    case "-": return a - b === problem.target;
+    case "*": return a * b === problem.target;
+    case "/":
+      if (a === 0 || b === 0) return false;
+      if (a % b === 0 && a / b === problem.target) return true;
+      if (b % a === 0 && b / a === problem.target) return true;
+      return false;
+    default: return false;
+  }
+}
+
+function symbol(op) { return op === "/" ? "÷" : op; }
+
+function problemDisplay(problem) {
+  return `x ${symbol(problem.operation)} y = ${problem.target}`;
+}
+
+function allValidPairsForProblem(problem, settings) {
+  const values = [];
+  for (let v = settings.minValue; v <= settings.maxValue; v++) values.push(v);
+  const pairs = [];
+  for (const a of values) for (const b of values) {
+    if (!allowedValue(problem, a, settings) || !allowedValue(problem, b, settings)) continue;
+    if (isValidPair(problem, a, b)) pairs.push([a, b]);
+  }
+  if (problem.operation === "+" || problem.operation === "*") {
+    const seen = new Set();
+    const unique = [];
+    for (const [a,b] of pairs) {
+      const key = [Math.min(a,b), Math.max(a,b)].join(",");
+      if (!seen.has(key)) { seen.add(key); unique.push([a,b]); }
+    }
+    return unique;
+  }
+  return pairs;
+}
+
+function randInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function randomProblem(settings, operationChoice) {
+  const available = settings.operations;
+  const operation = operationChoice === "Wisselend"
+    ? available[randInt(0, available.length - 1)]
+    : operationChoice;
+
+  let target;
+  if (operation === "+") {
+    let low = Math.max(3, settings.minValue * 2);
+    let high = Math.max(6, settings.maxValue * 2);
+    if (low > high) high = low + 1;
+    target = randInt(low, high);
+  } else if (operation === "-") {
+    target = randInt(0, settings.maxValue);
+  } else if (operation === "*") {
+    target = randInt(0, settings.maxValue * settings.maxValue);
+  } else {
+    target = randInt(1, Math.max(1, settings.maxValue));
+  }
+  return { operation, target };
+}
+
+function getNeighbors(r, c, size, allowDiagonal=true) {
+  const nbs = [];
+  for (let dr=-1; dr<=1; dr++) for (let dc=-1; dc<=1; dc++) {
+    if (dr === 0 && dc === 0) continue;
+    if (!allowDiagonal && Math.abs(dr) + Math.abs(dc) !== 1) continue;
+    const nr = r + dr, nc = c + dc;
+    if (nr >= 0 && nr < size && nc >= 0 && nc < size) nbs.push([nr,nc]);
+  }
+  return nbs;
+}
+
+function areAdjacent(a, b) {
+  const dr = Math.abs(a[0]-b[0]), dc = Math.abs(a[1]-b[1]);
+  if (dr === 0 && dc === 0) return false;
+  return dr <= 1 && dc <= 1;
+}
+
+function iterUniqueNeighborPairs(size) {
+  const pairs = [];
+  for (let r=0; r<size; r++) for (let c=0; c<size; c++) {
+    const a = [r,c];
+    for (const nb of getNeighbors(r,c,size,true)) {
+      if (r < nb[0] || (r === nb[0] && c < nb[1])) pairs.push([a, nb]);
+    }
+  }
+  return pairs;
+}
+
+function findValidPairsInGrid(grid, problem, settings) {
+  const pairs = [];
+  const neighborPairs = iterUniqueNeighborPairs(settings.gridSize);
+  for (const [[r1,c1],[r2,c2]] of neighborPairs) {
+    if (isValidPair(problem, grid[r1][c1], grid[r2][c2])) pairs.push([[r1,c1],[r2,c2]]);
+  }
+  return pairs;
+}
+
+function countValidPairs(grid, problem, settings) {
+  return findValidPairsInGrid(grid, problem, settings).length;
+}
+
+function randomFillValue(problem, settings) {
+  const candidates = [];
+  for (let v=settings.minValue; v<=settings.maxValue; v++) {
+    if (allowedValue(problem, v, settings)) candidates.push(v);
+  }
+  return candidates[randInt(0, candidates.length - 1)];
+}
+
+function emptyGrid(size) {
+  return Array.from({length:size}, () => Array.from({length:size}, () => null));
+}
+
+function placeSolutionPair(grid, pairValues, settings) {
+  const pairs = iterUniqueNeighborPairs(settings.gridSize).slice();
+  shuffle(pairs);
+  for (const [[r1,c1],[r2,c2]] of pairs) {
+    if (grid[r1][c1] !== null || grid[r2][c2] !== null) continue;
+    let [a,b] = pairValues;
+    if (Math.random() < 0.5) [a,b] = [b,a];
+    grid[r1][c1] = a; grid[r2][c2] = b;
+    return true;
+  }
+  return false;
+}
+
+function finalizeGrid(tempGrid, problem, settings) {
+  return tempGrid.map(row => row.map(v => v === null ? randomFillValue(problem, settings) : v));
+}
+
+function shuffle(arr) {
+  for (let i=arr.length-1; i>0; i--) {
+    const j = Math.floor(Math.random() * (i+1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+function generateGrid(problem, settings) {
+  const validPairs = allValidPairsForProblem(problem, settings);
+  if (!validPairs.length) throw new Error("Geen geldige getallenparen.");
+  const targetSolutions = randInt(settings.minSolutions, settings.maxSolutions);
+
+  for (let attempt=0; attempt<300; attempt++) {
+    const temp = emptyGrid(settings.gridSize);
+    const choices = validPairs.slice();
+    shuffle(choices);
+
+    let placed = 0;
+    for (const pairVals of choices) {
+      if (placed >= targetSolutions) break;
+      if (placeSolutionPair(temp, pairVals, settings)) placed++;
+    }
+    if (placed === 0) continue;
+
+    const grid = finalizeGrid(temp, problem, settings);
+    const actual = countValidPairs(grid, problem, settings);
+    if (actual >= 1 && actual >= placed && actual >= settings.minSolutions && actual <= settings.maxSolutions) {
+      return grid;
+    }
+  }
+  throw new Error("Kon geen geldig raster genereren.");
+}
+
+function applyCurrentSettings() {
+  const base = clone(config[state.difficulty]);
+  state.settings = {
+    gridSize: Number(base.gridSize),
+    minValue: Number(base.minValue),
+    maxValue: Number(base.maxValue),
+    minSolutions: Number(base.minSolutions),
+    maxSolutions: Number(base.maxSolutions),
+    operations: base.operations.slice(),
+    showNeighborsOnFirstPick: !!base.showNeighborsOnFirstPick,
+    problemLimit: null,
+    timerSeconds: null
+  };
+  if (state.mode.endsWith(" opgaven")) {
+    state.settings.problemLimit = Number(config.FreePlay.defaultProblemLimit);
+  } else if (state.mode.endsWith(" seconden")) {
+    state.settings.timerSeconds = Number(config.FreePlay.defaultTimerSeconds);
+  }
+}
+
+function updateOperationOptions() {
+  const ops = ["Wisselend", ...config[state.difficulty].operations];
+  el.operation.innerHTML = "";
+  for (const op of ops) {
+    const option = document.createElement("option");
+    option.value = op;
+    option.textContent = op === "*" ? "×" : op === "/" ? "÷" : op;
+    el.operation.appendChild(option);
+  }
+  if (!ops.includes(state.operationChoice)) state.operationChoice = "Wisselend";
+  el.operation.value = state.operationChoice;
+}
+
+function updateModeOptions() {
+  const labels = ["Vrij spel", `${config.FreePlay.defaultProblemLimit} opgaven`, `${config.FreePlay.defaultTimerSeconds} seconden`];
+  el.mode.innerHTML = "";
+  for (const m of labels) {
+    const option = document.createElement("option");
+    option.value = m;
+    option.textContent = m;
+    el.mode.appendChild(option);
+  }
+  if (state.mode.endsWith(" opgaven")) state.mode = labels[1];
+  else if (state.mode.endsWith(" seconden")) state.mode = labels[2];
+  else if (!labels.includes(state.mode)) state.mode = labels[0];
+  el.mode.value = state.mode;
+}
+
+function updateTexts() {
+  el.scoreText.textContent = `Score: ${state.score}`;
+  el.statsText.textContent = `Fouten: ${state.errors} | Opgaven: ${state.roundsPlayed}`;
+  el.problemText.textContent = state.currentProblem ? problemDisplay(state.currentProblem) : "x + y = ?";
+  el.difficultyInfo.textContent = `${DIFFICULTY_INFO[state.difficulty]} | Actief min_solutions=${state.settings.minSolutions}, max_solutions=${state.settings.maxSolutions}`;
+  if (state.settings.timerSeconds !== null) el.timerText.textContent = `⏱️ Tijd over: ${state.timeLeft} sec`;
+  else if (state.settings.problemLimit !== null) el.timerText.textContent = `📊 Opgaven: ${state.roundsPlayed}/${state.settings.problemLimit}`;
+  else el.timerText.textContent = "";
+}
+
+function setStatus(msg) {
+  el.statusText.textContent = msg;
+}
+
+function renderGrid() {
+  el.grid.innerHTML = "";
+  const size = state.settings.gridSize;
+  el.grid.style.gridTemplateColumns = `repeat(${size}, 72px)`;
+  if (window.innerWidth < 801) el.grid.style.gridTemplateColumns = `repeat(${size}, 58px)`;
+
+  state.gridValues.forEach((row, r) => {
+    row.forEach((value, c) => {
+      const btn = document.createElement("button");
+      btn.className = "cell";
+      btn.textContent = value;
+      btn.dataset.r = r;
+      btn.dataset.c = c;
+      btn.disabled = state.gameOver;
+      btn.addEventListener("click", () => handleCellClick(r, c));
+      el.grid.appendChild(btn);
+    });
+  });
+}
+
+function getCellButton(r, c) {
+  return [...el.grid.children].find(btn => Number(btn.dataset.r) === r && Number(btn.dataset.c) === c);
+}
+
+function clearCellClasses() {
+  [...el.grid.children].forEach(btn => btn.classList.remove("selected","neighbor","correct","incorrect"));
+}
+
+function markCells(cells, cls) {
+  for (const [r,c] of cells) {
+    const btn = getCellButton(r,c);
+    if (btn) btn.classList.add(cls);
+  }
+}
+
+function resetNeighborHighlights() {
+  [...el.grid.children].forEach(btn => btn.classList.remove("neighbor"));
+}
+
+function showSolutions(pairs) {
+  el.solutionsBox.hidden = false;
+  el.solutionsList.innerHTML = "";
+  el.solutionsSummary.textContent = `Opgave: ${problemDisplay(state.currentProblem)} | Aantal goede oplossingen: ${pairs.length}`;
+  const highlight = new Set();
+
+  for (const [[r1,c1],[r2,c2]] of pairs) {
+    const a = state.gridValues[r1][c1];
+    const b = state.gridValues[r2][c2];
+    let expr;
+    if (state.currentProblem.operation === "/") {
+      const groot = Math.max(a,b);
+      const klein = Math.min(a,b);
+      expr = `${groot} ÷ ${klein} = ${state.currentProblem.target}`;
+    } else {
+      expr = `${a} ${symbol(state.currentProblem.operation)} ${b} = ${state.currentProblem.target}`;
+    }
+    const li = document.createElement("li");
+    li.textContent = `(${r1+1},${c1+1})=${a} en (${r2+1},${c2+1})=${b} → ${expr}`;
+    el.solutionsList.appendChild(li);
+    highlight.add(`${r1},${c1}`);
+    highlight.add(`${r2},${c2}`);
+  }
+
+  const cells = [...highlight].map(s => s.split(",").map(Number));
+  markCells(cells, "correct");
+}
+
+function hideSolutions() {
+  el.solutionsBox.hidden = true;
+  el.solutionsList.innerHTML = "";
+  el.solutionsSummary.textContent = "";
+}
+
+function cancelTimer() {
+  if (state.timerId) clearTimeout(state.timerId);
+  state.timerId = null;
+}
+
+function finishGame(message, reasonType="") {
+  state.gameOver = true;
+  state.inputLocked = true;
+  cancelTimer();
+  setStatus(message);
+  updateTexts();
+  if (reasonType === "timer") playEndTimer();
+  if (reasonType === "limit") playMaxReached();
+}
+
+function tickTimer() {
+  updateTexts();
+  if (state.gameOver || state.timeLeft === null) return;
+  if (state.timeLeft <= 0) {
+    finishGame("Tijd is om!", "timer");
+    return;
+  }
+  state.timeLeft -= 1;
+  state.timerId = setTimeout(tickTimer, 1000);
+}
+
+function startNewRound() {
+  if (state.gameOver) return;
+
+  if (state.settings.problemLimit !== null && state.roundsPlayed >= state.settings.problemLimit) {
+    finishGame("Doel bereikt. Einde spel.", "limit");
+    return;
+  }
+
+  hideSolutions();
+  state.selectedCells = [];
+  state.inputLocked = false;
+  state.wrongAttemptsCurrentRound = 0;
+
+  for (let attempt=0; attempt<100; attempt++) {
+    try {
+      const problem = randomProblem(state.settings, state.operationChoice);
+      const validPairs = allValidPairsForProblem(problem, state.settings);
+      if (!validPairs.length) continue;
+      const grid = generateGrid(problem, state.settings);
+      if (countValidPairs(grid, problem, state.settings) < 1) continue;
+
+      state.currentProblem = problem;
+      state.gridValues = grid;
+      state.roundsPlayed += 1;
+      renderGrid();
+      clearCellClasses();
+      updateTexts();
+      setStatus("Kies twee aangrenzende getallen.");
+      playNewProblem();
+      return;
+    } catch(e) {}
+  }
+  finishGame("Kon geen geldige opgave maken met deze instellingen.");
+}
+
+function startNewGame() {
+  cancelTimer();
+  state.difficulty = el.difficulty.value;
+  state.operationChoice = el.operation.value;
+  state.mode = el.mode.value;
+
+  applyCurrentSettings();
+
+  state.score = 0;
+  state.errors = 0;
+  state.roundsPlayed = 0;
+  state.selectedCells = [];
+  state.currentProblem = null;
+  state.gridValues = [];
+  state.gameOver = false;
+  state.inputLocked = false;
+  state.timeLeft = state.settings.timerSeconds;
+  state.wrongAttemptsCurrentRound = 0;
+
+  setStatus("Nieuw spel gestart.");
+  updateTexts();
+
+  if (state.settings.timerSeconds !== null) {
+    tickTimer();
+  }
+  startNewRound();
+}
+
+function handleWrong(reason="Onjuiste combinatie.", showSolutionsNow=false) {
+  state.errors += 1;
+  state.wrongAttemptsCurrentRound += 1;
+  updateTexts();
+  markCells(state.selectedCells, "incorrect");
+  playError();
+
+  if (showSolutionsNow || state.wrongAttemptsCurrentRound >= 3) {
+    const pairs = findValidPairsInGrid(state.gridValues, state.currentProblem, state.settings);
+    if (pairs.length) {
+      setStatus("Fout antwoord. Goede oplossingen worden getoond.");
+      showSolutions(pairs);
+    } else {
+      setStatus("Geen oplossingen gevonden (zou niet mogen).");
+    }
+  } else {
+    setStatus(reason);
+  }
+
+  setTimeout(() => {
+    clearCellClasses();
+    state.selectedCells = [];
+    if (!state.gameOver) {
+      state.inputLocked = false;
+      setStatus(state.wrongAttemptsCurrentRound >= 3 ? "Bekijk de oplossingen en probeer opnieuw." : "Probeer opnieuw.");
+      if (state.wrongAttemptsCurrentRound >= 3) {
+        const pairs = findValidPairsInGrid(state.gridValues, state.currentProblem, state.settings);
+        showSolutions(pairs);
+      }
+    }
+  }, 900);
+}
+
+function handleCorrect() {
+  state.score += 1;
+  updateTexts();
+  markCells(state.selectedCells, "correct");
+  setStatus("Goed! Nieuwe opgave volgt.");
+  setTimeout(startNewRound, 450);
+}
+
+function handleCellClick(r, c) {
+  if (state.gameOver || state.inputLocked) return;
+
+  const cellKey = `${r},${c}`;
+  const selectedKeys = state.selectedCells.map(x => x.join(","));
+  if (selectedKeys.includes(cellKey)) {
+    if (state.selectedCells.length === 1) {
+      state.selectedCells = [];
+      clearCellClasses();
+      if (!el.solutionsBox.hidden) {
+        const pairs = findValidPairsInGrid(state.gridValues, state.currentProblem, state.settings);
+        showSolutions(pairs);
+      }
+      setStatus("Getal uitgeschakeld. Kies twee aangrenzende getallen.");
+    } else {
+      setStatus("Hetzelfde vakje twee keer kiezen mag niet.");
+    }
+    return;
+  }
+
+  if (state.selectedCells.length === 0) {
+    if (!el.solutionsBox.hidden) hideSolutions();
+  }
+
+  state.selectedCells.push([r,c]);
+  clearCellClasses();
+  markCells(state.selectedCells, "selected");
+
+  if (state.selectedCells.length === 1) {
+    if (state.settings.showNeighborsOnFirstPick) {
+      markCells(getNeighbors(r, c, state.settings.gridSize, true), "neighbor");
+      markCells(state.selectedCells, "selected");
+    }
+    setStatus("Nog één getal kiezen.");
+    return;
+  }
+
+  resetNeighborHighlights();
+  state.inputLocked = true;
+
+  const [first, second] = state.selectedCells;
+  if (!areAdjacent(first, second)) {
+    handleWrong("Fout: de gekozen getallen raken elkaar niet.");
+    return;
+  }
+
+  const a = state.gridValues[first[0]][first[1]];
+  const b = state.gridValues[second[0]][second[1]];
+  if (isValidPair(state.currentProblem, a, b)) {
+    handleCorrect();
+  } else {
+    handleWrong("Fout antwoord.");
+  }
+}
+
+function buildSelectors() {
+  el.difficulty.innerHTML = "";
+  for (const diff of ["Beginner","Basis","Gevorderd","Expert"]) {
+    const option = document.createElement("option");
+    option.value = diff;
+    option.textContent = diff;
+    el.difficulty.appendChild(option);
+  }
+  el.difficulty.value = state.difficulty;
+  updateOperationOptions();
+  updateModeOptions();
+  el.soundEnabled.value = String(config.Sound.enabled);
+}
+
+function buildDifficultySettings() {
+  el.difficultySettings.innerHTML = "";
+  for (const diff of ["Beginner","Basis","Gevorderd","Expert"]) {
+    const box = document.createElement("div");
+    box.className = "card";
+    box.innerHTML = `
+      <h4 style="margin:0 0 8px;">${diff}</h4>
+      <div style="display:grid; gap:8px;">
+        <div><label>grid_size</label><input type="number" min="2" max="10" data-diff="${diff}" data-key="gridSize" value="${config[diff].gridSize}"></div>
+        <div><label>min_value</label><input type="number" min="0" max="99" data-diff="${diff}" data-key="minValue" value="${config[diff].minValue}"></div>
+        <div><label>max_value</label><input type="number" min="0" max="99" data-diff="${diff}" data-key="maxValue" value="${config[diff].maxValue}"></div>
+        <div><label>min_solutions</label><input type="number" min="1" max="20" data-diff="${diff}" data-key="minSolutions" value="${config[diff].minSolutions}"></div>
+        <div><label>max_solutions</label><input type="number" min="1" max="20" data-diff="${diff}" data-key="maxSolutions" value="${config[diff].maxSolutions}"></div>
+        <label class="checkbox"><input type="checkbox" data-diff="${diff}" data-key="showNeighborsOnFirstPick" ${config[diff].showNeighborsOnFirstPick ? "checked":""}> show_neighbors_on_first_pick</label>
+      </div>
+    `;
+    el.difficultySettings.appendChild(box);
+  }
+
+  [...el.difficultySettings.querySelectorAll("input")].forEach(inp => {
+    inp.addEventListener("change", () => {
+      const diff = inp.dataset.diff;
+      const key = inp.dataset.key;
+      config[diff][key] = inp.type === "checkbox" ? inp.checked : Number(inp.value);
+    });
+  });
+}
+
+function syncFreeplayInputs() {
+  el.problemLimit.value = config.FreePlay.defaultProblemLimit;
+  el.timerSeconds.value = config.FreePlay.defaultTimerSeconds;
+}
+
+function saveSettingsFromForm() {
+  config.FreePlay.defaultProblemLimit = Number(el.problemLimit.value || DEFAULTS.FreePlay.defaultProblemLimit);
+  config.FreePlay.defaultTimerSeconds = Number(el.timerSeconds.value || DEFAULTS.FreePlay.defaultTimerSeconds);
+  config.Sound.enabled = el.soundEnabled.value === "true";
+  saveConfig();
+  updateModeOptions();
+  updateOperationOptions();
+  applyCurrentSettings();
+  updateTexts();
+  setStatus("Instellingen bewaard op dit apparaat.");
+}
+
+el.difficulty.addEventListener("change", () => {
+  state.difficulty = el.difficulty.value;
+  updateOperationOptions();
+  applyCurrentSettings();
+  updateTexts();
+});
+
+el.operation.addEventListener("change", () => { state.operationChoice = el.operation.value; });
+el.mode.addEventListener("change", () => { state.mode = el.mode.value; });
+el.soundEnabled.addEventListener("change", () => { config.Sound.enabled = el.soundEnabled.value === "true"; saveConfig(); });
+el.newGameBtn.addEventListener("click", startNewGame);
+el.saveSettingsBtn.addEventListener("click", saveSettingsFromForm);
+
+buildSelectors();
+buildDifficultySettings();
+syncFreeplayInputs();
+applyCurrentSettings();
+updateTexts();
+setStatus("Kies 'Nieuw spel' om te starten.");
+</script>
+</body>
+</html>
