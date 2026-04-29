@@ -1,28 +1,31 @@
-ABACUS GitHub Pages pakket
+ABACUS GitHub Pages pakket - versie met gebruikersdata
 
 Bestanden:
 - index.html
 - .nojekyll
 - README_GitHub_Pages.txt
 
-Upload:
-1. Open je GitHub repository.
+Upload naar GitHub:
+1. Open je repository educatie-web.
 2. Kies Add file > Upload files.
 3. Upload index.html, .nojekyll en README_GitHub_Pages.txt.
 4. Commit de wijzigingen.
-5. Ga naar Settings > Pages.
-6. Kies Deploy from a branch.
-7. Kies branch: main en map: / (root).
-8. Klik Save.
+5. Wacht tot GitHub Pages opnieuw gebouwd is.
 
 Nieuw in deze versie:
-- alle parameters per moeilijkheid zijn zichtbaar in de webinterface:
-  - grid_size
-  - min_value
-  - max_value
-  - min_solutions
-  - max_solutions
-  - show_neighbors_on_first_pick
+- gebruikersnaam kiezen of toevoegen
+- sessieresultaten lokaal bewaren in de browser
+- analyse per gebruiker en operatie (+, -, ×, ÷)
+- eenvoudige administrator-knop
+- CSV-export
+- alle gebruiksdata verwijderen
+- alle moeilijkheidsparameters zichtbaar
 
-Na publiceren is de site bereikbaar via:
-https://jouw-gebruikersnaam.github.io/jouw-repo-naam/
+Administrator:
+- klik op 'Administrator'
+- standaard wachtwoord: admin
+
+Let op:
+- Webdata wordt lokaal in de browser opgeslagen via localStorage.
+- Bij wissen van browsergegevens kan deze data verdwijnen.
+- Dit is een eerste basis/prototype voor gebruiksdata.

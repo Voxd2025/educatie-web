@@ -87,8 +87,20 @@
     .footer-note {
       margin-top: 14px; color: var(--muted); font-size: 13px; text-align: center;
     }
+
+    .user-panel {
+      margin-bottom: 16px; display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 10px; align-items: end;
+    }
+    .admin-panel { margin-top: 16px; }
+    .admin-panel table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 10px; }
+    .admin-panel th, .admin-panel td { border: 1px solid var(--line); padding: 6px; text-align: left; }
+    .admin-panel th { background: #f3f4f6; }
+    .admin-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+    .small-muted { color: var(--muted); font-size: 13px; margin-top: 6px; }
+
     @media (max-width: 800px) {
       .topbar { grid-template-columns: 1fr 1fr; }
+      .user-panel { grid-template-columns: 1fr; }
       .settings { grid-template-columns: 1fr; }
       .cell { width: 58px; height: 58px; font-size: 24px; }
       .problem { font-size: 28px; }
@@ -101,6 +113,18 @@
   <div class="wrap">
     <div class="card">
       <h1>ABACUS Web</h1>
+      <div class="user-panel">
+        <div>
+          <label for="userSelect">Gebruiker</label>
+          <select id="userSelect"></select>
+        </div>
+        <div>
+          <label for="newUsername">Nieuwe gebruikersnaam</label>
+          <input id="newUsername" type="text" placeholder="Bijv. Piet" />
+        </div>
+        <div><button class="secondary" id="addUserBtn">Gebruiker toevoegen</button></div>
+        <div><button class="secondary" id="adminToggleBtn">Administrator</button></div>
+      </div>
       <div class="topbar">
         <div>
           <label for="difficulty">Moeilijkheid</label>
@@ -145,6 +169,20 @@
         <div id="solutionsSummary"></div>
         <ul id="solutionsList"></ul>
       </div>
+    </div>
+
+    <div class="card admin-panel" id="adminPanel" hidden>
+      <h3>Administrator: gebruiksdata</h3>
+      <div class="admin-actions">
+        <button class="secondary" id="refreshAdminBtn">Verversen</button>
+        <button class="secondary" id="exportCsvBtn">CSV exporteren</button>
+        <button class="secondary" id="deleteAllDataBtn">Alle gebruiksdata verwijderen</button>
+      </div>
+      <div class="small-muted">Data wordt lokaal in deze browser opgeslagen. Bij wissen van browsergegevens kan deze data verdwijnen.</div>
+      <h4>Analyse per gebruiker en operatie</h4>
+      <div id="analysisBox"></div>
+      <h4>Opgeslagen sessies</h4>
+      <div id="sessionsBox"></div>
     </div>
 
     <div class="settings">
@@ -261,7 +299,15 @@ const state = {
   difficulty: "Basis",
   operationChoice: "Wisselend",
   mode: "Vrij spel",
-  settings: null
+  settings: null,
+  sessionStartTime: null,
+  operationStats: {
+    "+": { correct: 0, wrong: 0 },
+    "-": { correct: 0, wrong: 0 },
+    "*": { correct: 0, wrong: 0 },
+    "/": { correct: 0, wrong: 0 }
+  },
+  sessionSaved: false
 };
 
 const el = {
@@ -283,8 +329,106 @@ const el = {
   difficultySettings: document.getElementById("difficultySettings"),
   problemLimit: document.getElementById("problemLimit"),
   timerSeconds: document.getElementById("timerSeconds"),
-  saveSettingsBtn: document.getElementById("saveSettingsBtn")
+  saveSettingsBtn: document.getElementById("saveSettingsBtn"),
+  userSelect: document.getElementById("userSelect"),
+  newUsername: document.getElementById("newUsername"),
+  addUserBtn: document.getElementById("addUserBtn"),
+  adminToggleBtn: document.getElementById("adminToggleBtn"),
+  adminPanel: document.getElementById("adminPanel"),
+  refreshAdminBtn: document.getElementById("refreshAdminBtn"),
+  exportCsvBtn: document.getElementById("exportCsvBtn"),
+  deleteAllDataBtn: document.getElementById("deleteAllDataBtn"),
+  analysisBox: document.getElementById("analysisBox"),
+  sessionsBox: document.getElementById("sessionsBox")
 };
+
+
+function loadUsageData() {
+  try {
+    const raw = localStorage.getItem("abacusUsageData");
+    if (!raw) return { users: [], sessions: [] };
+    const data = JSON.parse(raw);
+    return { users: Array.isArray(data.users) ? data.users : [], sessions: Array.isArray(data.sessions) ? data.sessions : [] };
+  } catch { return { users: [], sessions: [] }; }
+}
+function saveUsageData() { localStorage.setItem("abacusUsageData", JSON.stringify(usageData)); }
+let usageData = loadUsageData();
+function activeUsername() { return el.userSelect && el.userSelect.value ? el.userSelect.value : ""; }
+function ensureDefaultUser() {
+  if (!usageData.users.length) { usageData.users.push({ username: "Speler", created_at: new Date().toISOString(), active: true }); saveUsageData(); }
+}
+function renderUsers() {
+  if (!el.userSelect) return;
+  ensureDefaultUser();
+  const current = el.userSelect.value || usageData.users[0].username;
+  el.userSelect.innerHTML = "";
+  usageData.users.filter(u => u.active !== false).forEach(u => {
+    const opt = document.createElement("option"); opt.value = u.username; opt.textContent = u.username; el.userSelect.appendChild(opt);
+  });
+  if ([...el.userSelect.options].some(o => o.value === current)) el.userSelect.value = current;
+}
+function addUser() {
+  const name = (el.newUsername.value || "").trim();
+  if (!name) { setStatus("Vul eerst een gebruikersnaam in."); return; }
+  if (usageData.users.some(u => u.username.toLowerCase() === name.toLowerCase())) {
+    setStatus("Deze gebruikersnaam bestaat al.");
+    el.userSelect.value = usageData.users.find(u => u.username.toLowerCase() === name.toLowerCase()).username;
+    return;
+  }
+  usageData.users.push({ username: name, created_at: new Date().toISOString(), active: true });
+  saveUsageData(); renderUsers(); el.userSelect.value = name; el.newUsername.value = ""; setStatus(`Gebruiker '${name}' toegevoegd.`); renderAdmin();
+}
+function resetSessionStats() {
+  state.operationStats = { "+": { correct: 0, wrong: 0 }, "-": { correct: 0, wrong: 0 }, "*": { correct: 0, wrong: 0 }, "/": { correct: 0, wrong: 0 } };
+  state.sessionStartTime = new Date(); state.sessionSaved = false;
+}
+function recordOperationResult(operation, wasCorrect) {
+  if (!state.operationStats[operation]) state.operationStats[operation] = { correct: 0, wrong: 0 };
+  if (wasCorrect) state.operationStats[operation].correct += 1; else state.operationStats[operation].wrong += 1;
+}
+function saveCurrentSession(reason="afgesloten") {
+  if (state.sessionSaved || !state.sessionStartTime || state.roundsPlayed === 0) return;
+  const end = new Date(); const duration = Math.max(0, Math.round((end - state.sessionStartTime) / 1000)); const stats = state.operationStats;
+  const session = {
+    session_id: "S" + Date.now(), username: activeUsername() || "Speler", date: end.toISOString().slice(0, 10),
+    start_time: state.sessionStartTime.toISOString(), end_time: end.toISOString(), duration_seconds: duration,
+    difficulty: state.difficulty, operation_mode: state.operationChoice, game_mode: state.mode,
+    score: state.score, errors: state.errors, total_problems: state.roundsPlayed, end_reason: reason,
+    plus_correct: stats["+"]?.correct || 0, plus_wrong: stats["+"]?.wrong || 0,
+    minus_correct: stats["-"]?.correct || 0, minus_wrong: stats["-"]?.wrong || 0,
+    multiply_correct: stats["*"]?.correct || 0, multiply_wrong: stats["*"]?.wrong || 0,
+    divide_correct: stats["/"]?.correct || 0, divide_wrong: stats["/"]?.wrong || 0
+  };
+  usageData.sessions.push(session); saveUsageData(); state.sessionSaved = true; renderAdmin();
+}
+function escapeHtml(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function renderAdmin() {
+  if (!el.analysisBox || !el.sessionsBox) return;
+  const byUser = {};
+  for (const s of usageData.sessions) {
+    if (!byUser[s.username]) byUser[s.username] = {sessions:0, score:0, errors:0, problems:0, plus_correct:0, plus_wrong:0, minus_correct:0, minus_wrong:0, multiply_correct:0, multiply_wrong:0, divide_correct:0, divide_wrong:0};
+    const u = byUser[s.username]; u.sessions++; u.score += Number(s.score||0); u.errors += Number(s.errors||0); u.problems += Number(s.total_problems||0);
+    for (const k of ["plus_correct","plus_wrong","minus_correct","minus_wrong","multiply_correct","multiply_wrong","divide_correct","divide_wrong"]) u[k] += Number(s[k]||0);
+  }
+  const pct = (wrong, correct) => { const total = Number(wrong)+Number(correct); return total ? Math.round((Number(wrong)/total)*100)+"%" : "-"; };
+  let ah = `<table><thead><tr><th>Gebruiker</th><th>Sessies</th><th>Score</th><th>Fouten</th><th>Opgaven</th><th>+ fout%</th><th>- fout%</th><th>× fout%</th><th>÷ fout%</th></tr></thead><tbody>`;
+  for (const [username,u] of Object.entries(byUser)) ah += `<tr><td>${escapeHtml(username)}</td><td>${u.sessions}</td><td>${u.score}</td><td>${u.errors}</td><td>${u.problems}</td><td>${pct(u.plus_wrong,u.plus_correct)}</td><td>${pct(u.minus_wrong,u.minus_correct)}</td><td>${pct(u.multiply_wrong,u.multiply_correct)}</td><td>${pct(u.divide_wrong,u.divide_correct)}</td></tr>`;
+  ah += `</tbody></table>`; if (!usageData.sessions.length) ah = "<p>Nog geen sessies opgeslagen.</p>"; el.analysisBox.innerHTML = ah;
+  let sh = `<table><thead><tr><th>Datum</th><th>Gebruiker</th><th>Niveau</th><th>Modus</th><th>Score</th><th>Fouten</th><th>Opgaven</th><th>Duur</th></tr></thead><tbody>`;
+  for (const s of usageData.sessions.slice().reverse().slice(0,100)) sh += `<tr><td>${escapeHtml(s.date)}</td><td>${escapeHtml(s.username)}</td><td>${escapeHtml(s.difficulty)}</td><td>${escapeHtml(s.game_mode)}</td><td>${s.score}</td><td>${s.errors}</td><td>${s.total_problems}</td><td>${s.duration_seconds}s</td></tr>`;
+  sh += `</tbody></table>`; if (!usageData.sessions.length) sh = "<p>Nog geen sessies opgeslagen.</p>"; el.sessionsBox.innerHTML = sh;
+}
+function exportUsageCsv() {
+  const headers = ["session_id","username","date","start_time","end_time","duration_seconds","difficulty","operation_mode","game_mode","score","errors","total_problems","end_reason","plus_correct","plus_wrong","minus_correct","minus_wrong","multiply_correct","multiply_wrong","divide_correct","divide_wrong"];
+  const rows = [headers.join(",")];
+  for (const s of usageData.sessions) rows.push(headers.map(h => `"${String(s[h] ?? "").replace(/"/g, '""')}"`).join(","));
+  const blob = new Blob([rows.join("\n")], {type:"text/csv;charset=utf-8"}); const url = URL.createObjectURL(blob); const a = document.createElement("a");
+  a.href=url; a.download="abacus_gebruiksdata.csv"; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+function deleteAllUsageData() {
+  if (!confirm("Weet je zeker dat je alle gebruikers- en sessiedata wilt verwijderen? Dit kan niet ongedaan worden gemaakt.")) return;
+  usageData = {users: [], sessions: []}; saveUsageData(); renderUsers(); renderAdmin(); setStatus("Alle gebruiksdata is verwijderd.");
+}
 
 function clone(obj) { return JSON.parse(JSON.stringify(obj)); }
 
@@ -628,6 +772,7 @@ function cancelTimer() {
 }
 
 function finishGame(message, reasonType="") {
+  saveCurrentSession(reasonType || message);
   state.gameOver = true;
   state.inputLocked = true;
   cancelTimer();
@@ -684,6 +829,7 @@ function startNewRound() {
 }
 
 function startNewGame() {
+  saveCurrentSession("nieuw spel gestart");
   cancelTimer();
   state.difficulty = el.difficulty.value;
   state.operationChoice = el.operation.value;
@@ -701,6 +847,7 @@ function startNewGame() {
   state.inputLocked = false;
   state.timeLeft = state.settings.timerSeconds;
   state.wrongAttemptsCurrentRound = 0;
+  resetSessionStats();
 
   setStatus("Nieuw spel gestart.");
   updateTexts();
@@ -712,6 +859,7 @@ function startNewGame() {
 }
 
 function handleWrong(reason="Onjuiste combinatie.", showSolutionsNow=false) {
+  recordOperationResult(state.currentProblem.operation, false);
   state.errors += 1;
   state.wrongAttemptsCurrentRound += 1;
   updateTexts();
@@ -745,6 +893,7 @@ function handleWrong(reason="Onjuiste combinatie.", showSolutionsNow=false) {
 }
 
 function handleCorrect() {
+  recordOperationResult(state.currentProblem.operation, true);
   state.score += 1;
   updateTexts();
   markCells(state.selectedCells, "correct");
@@ -878,13 +1027,26 @@ el.mode.addEventListener("change", () => { state.mode = el.mode.value; });
 el.soundEnabled.addEventListener("change", () => { config.Sound.enabled = el.soundEnabled.value === "true"; saveConfig(); });
 el.newGameBtn.addEventListener("click", startNewGame);
 el.saveSettingsBtn.addEventListener("click", saveSettingsFromForm);
+el.addUserBtn.addEventListener("click", addUser);
+el.adminToggleBtn.addEventListener("click", () => {
+  const password = prompt("Administrator wachtwoord:");
+  if (password !== "admin") { setStatus("Administrator toegang geweigerd."); return; }
+  el.adminPanel.hidden = !el.adminPanel.hidden;
+  renderAdmin();
+});
+el.refreshAdminBtn.addEventListener("click", renderAdmin);
+el.exportCsvBtn.addEventListener("click", exportUsageCsv);
+el.deleteAllDataBtn.addEventListener("click", deleteAllUsageData);
+window.addEventListener("beforeunload", () => saveCurrentSession("pagina gesloten"));
 
 buildSelectors();
 buildDifficultySettings();
 syncFreeplayInputs();
+renderUsers();
+renderAdmin();
 applyCurrentSettings();
 updateTexts();
-setStatus("Kies 'Nieuw spel' om te starten.");
+setStatus("Kies een gebruiker en klik op 'Nieuw spel' om te starten.");
 </script>
 </body>
 </html>
