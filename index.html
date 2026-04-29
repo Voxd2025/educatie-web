@@ -414,8 +414,10 @@ function renderAdmin() {
   let ah = `<table><thead><tr><th>Gebruiker</th><th>Sessies</th><th>Score</th><th>Fouten</th><th>Opgaven</th><th>+ fout%</th><th>- fout%</th><th>× fout%</th><th>÷ fout%</th></tr></thead><tbody>`;
   for (const [username,u] of Object.entries(byUser)) ah += `<tr><td>${escapeHtml(username)}</td><td>${u.sessions}</td><td>${u.score}</td><td>${u.errors}</td><td>${u.problems}</td><td>${pct(u.plus_wrong,u.plus_correct)}</td><td>${pct(u.minus_wrong,u.minus_correct)}</td><td>${pct(u.multiply_wrong,u.multiply_correct)}</td><td>${pct(u.divide_wrong,u.divide_correct)}</td></tr>`;
   ah += `</tbody></table>`; if (!usageData.sessions.length) ah = "<p>Nog geen sessies opgeslagen.</p>"; el.analysisBox.innerHTML = ah;
-  let sh = `<table><thead><tr><th>Datum</th><th>Gebruiker</th><th>Niveau</th><th>Modus</th><th>Score</th><th>Fouten</th><th>Opgaven</th><th>Duur</th></tr></thead><tbody>`;
-  for (const s of usageData.sessions.slice().reverse().slice(0,100)) sh += `<tr><td>${escapeHtml(s.date)}</td><td>${escapeHtml(s.username)}</td><td>${escapeHtml(s.difficulty)}</td><td>${escapeHtml(s.game_mode)}</td><td>${s.score}</td><td>${s.errors}</td><td>${s.total_problems}</td><td>${s.duration_seconds}s</td></tr>`;
+  let sh = `<table><thead><tr><th>Datum</th><th>Tijdstip</th><th>Gebruiker</th><th>Niveau</th><th>Modus</th><th>Score</th><th>Fouten</th><th>Opgaven</th><th>Duur</th></tr></thead><tbody>`;
+  for (const s of usageData.sessions.slice().reverse().slice(0,100)) sh += `<tr><td>${escapeHtml(s.date)}</td>
+      <td>${new Date(s.end_time).toLocaleTimeString()}</td>
+      <td>${escapeHtml(s.username)}</td><td>${escapeHtml(s.difficulty)}</td><td>${escapeHtml(s.game_mode)}</td><td>${s.score}</td><td>${s.errors}</td><td>${s.total_problems}</td><td>${s.duration_seconds}s</td></tr>`;
   sh += `</tbody></table>`; if (!usageData.sessions.length) sh = "<p>Nog geen sessies opgeslagen.</p>"; el.sessionsBox.innerHTML = sh;
 }
 function exportUsageCsv() {
@@ -1030,7 +1032,7 @@ el.saveSettingsBtn.addEventListener("click", saveSettingsFromForm);
 el.addUserBtn.addEventListener("click", addUser);
 el.adminToggleBtn.addEventListener("click", () => {
   const password = prompt("Administrator wachtwoord:");
-  if (password !== "admin") { setStatus("Administrator toegang geweigerd."); return; }
+  if (password !== "oefenen") { setStatus("Administrator toegang geweigerd."); return; }
   el.adminPanel.hidden = !el.adminPanel.hidden;
   renderAdmin();
 });

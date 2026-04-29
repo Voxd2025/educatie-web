@@ -1,5 +1,9 @@
 ABACUS GitHub Pages pakket - versie met gebruikersdata
 
+naar idee van
+
+ca. 2012 ABACUS/DeBasis;  Beat The Calculator!;   Dhr. Eugen O. Visual Basic
+
 Bestanden:
 - index.html
 - .nojekyll
@@ -23,9 +27,13 @@ Nieuw in deze versie:
 
 Administrator:
 - klik op 'Administrator'
-- standaard wachtwoord: admin
+- standaard wachtwoord: oefenen
 
 Let op:
 - Webdata wordt lokaal in de browser opgeslagen via localStorage.
 - Bij wissen van browsergegevens kan deze data verdwijnen.
 - Dit is een eerste basis/prototype voor gebruiksdata.
+
+Extra in versie 4:
+- Administrator wachtwoord aangepast naar: oefenen
+- Kolom Tijdstip toegevoegd tussen Datum en Gebruiker
