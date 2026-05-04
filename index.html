@@ -250,7 +250,8 @@ const DEFAULTS = {
   Gevorderd: { gridSize: 5, minValue: 0, maxValue: 9, minSolutions: 2, maxSolutions: 4, operations: ["+","-","*"], showNeighborsOnFirstPick: true },
   Expert: { gridSize: 6, minValue: 0, maxValue: 9, minSolutions: 3, maxSolutions: 5, operations: ["+","-","*","/"], showNeighborsOnFirstPick: true },
   FreePlay: { defaultProblemLimit: 10, defaultTimerSeconds: 60 },
-  Sound: { enabled: true }
+  Sound: { enabled: true },
+  Admin: { password: "oefenen" }
 };
 
 const DIFFICULTY_INFO = {
@@ -272,6 +273,7 @@ function loadConfig() {
       Expert: {...DEFAULTS.Expert, ...(saved.Expert || {})},
       FreePlay: {...DEFAULTS.FreePlay, ...(saved.FreePlay || {})},
       Sound: {...DEFAULTS.Sound, ...(saved.Sound || {})},
+      Admin: {...DEFAULTS.Admin, ...(saved.Admin || {})},
     };
   } catch {
     return structuredClone(DEFAULTS);
@@ -307,7 +309,9 @@ const state = {
     "*": { correct: 0, wrong: 0 },
     "/": { correct: 0, wrong: 0 }
   },
-  sessionSaved: false
+  sessionSaved: false,
+  operationRotation: [],
+  operationRotationIndex: 0
 };
 
 const el = {
@@ -339,7 +343,10 @@ const el = {
   exportCsvBtn: document.getElementById("exportCsvBtn"),
   deleteAllDataBtn: document.getElementById("deleteAllDataBtn"),
   analysisBox: document.getElementById("analysisBox"),
-  sessionsBox: document.getElementById("sessionsBox")
+  sessionsBox: document.getElementById("sessionsBox"),
+  adminPasswordInput: document.getElementById("adminPasswordInput"),
+  saveAdminPasswordBtn: document.getElementById("saveAdminPasswordBtn"),
+  usersAdminBox: document.getElementById("usersAdminBox")
 };
 
 
@@ -402,8 +409,103 @@ function saveCurrentSession(reason="afgesloten") {
   usageData.sessions.push(session); saveUsageData(); state.sessionSaved = true; renderAdmin();
 }
 function escapeHtml(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function renameUser(oldName, newName) {
+  oldName = String(oldName || "").trim();
+  newName = String(newName || "").trim();
+  if (!oldName || !newName || oldName === newName) return;
+  if (usageData.users.some(u => u.username.toLowerCase() === newName.toLowerCase())) {
+    alert("Deze gebruikersnaam bestaat al.");
+    return;
+  }
+  for (const u of usageData.users) {
+    if (u.username === oldName) u.username = newName;
+  }
+  for (const s of usageData.sessions) {
+    if (s.username === oldName) s.username = newName;
+  }
+  saveUsageData();
+  renderUsers();
+  if (el.userSelect) el.userSelect.value = newName;
+  renderAdmin();
+}
+
+function deleteUser(username) {
+  const ok = confirm(`Gebruiker '${username}' verwijderen? De opgeslagen sessies blijven bewaard.`);
+  if (!ok) return;
+  usageData.users = usageData.users.filter(u => u.username !== username);
+  saveUsageData();
+  renderUsers();
+  renderAdmin();
+}
+
+function deleteUserAndSessions(username) {
+  const ok = confirm(`Gebruiker '${username}' EN alle sessies van deze gebruiker verwijderen? Dit kan niet ongedaan worden gemaakt.`);
+  if (!ok) return;
+  usageData.users = usageData.users.filter(u => u.username !== username);
+  usageData.sessions = usageData.sessions.filter(s => s.username !== username);
+  saveUsageData();
+  renderUsers();
+  renderAdmin();
+}
+
+function saveAdminPassword() {
+  const pw = (el.adminPasswordInput.value || "").trim();
+  if (!pw) {
+    alert("Vul een administrator-wachtwoord in.");
+    return;
+  }
+  config.Admin.password = pw;
+  saveConfig();
+  setStatus("Administrator-wachtwoord bewaard op dit apparaat.");
+}
+
+function renderUsersAdmin() {
+  if (!el.usersAdminBox) return;
+  if (el.adminPasswordInput) el.adminPasswordInput.value = config.Admin.password || "oefenen";
+  if (!usageData.users.length) {
+    el.usersAdminBox.innerHTML = "<p>Geen gebruikers.</p>";
+    return;
+  }
+
+  let usersHtml = `<table><thead><tr><th>Gebruikersnaam</th><th>Aangemaakt</th><th>Acties</th></tr></thead><tbody>`;
+  for (const u of usageData.users) {
+    const safeName = escapeHtml(u.username);
+    usersHtml += `<tr>
+      <td><input type="text" value="${safeName}" data-old-username="${safeName}" class="admin-username-input"></td>
+      <td>${escapeHtml((u.created_at || "").slice(0, 10))}</td>
+      <td>
+        <button class="secondary admin-save-user" data-username="${safeName}">Bewaar naam</button>
+        <button class="secondary admin-delete-user" data-username="${safeName}">Verwijder gebruiker</button>
+        <button class="secondary admin-delete-user-sessions" data-username="${safeName}">Verwijder incl. sessies</button>
+      </td>
+    </tr>`;
+  }
+  usersHtml += `</tbody></table>
+    <div class="small-muted">Spelers hebben in deze versie geen wachtwoord. Alleen de administrator heeft een wachtwoord.</div>`;
+  el.usersAdminBox.innerHTML = usersHtml;
+
+  [...el.usersAdminBox.querySelectorAll(".admin-save-user")].forEach(btn => {
+    btn.addEventListener("click", () => {
+      const oldName = btn.dataset.username;
+      const input = [...el.usersAdminBox.querySelectorAll(".admin-username-input")]
+        .find(inp => inp.dataset.oldUsername === oldName);
+      renameUser(oldName, input ? input.value : oldName);
+    });
+  });
+
+  [...el.usersAdminBox.querySelectorAll(".admin-delete-user")].forEach(btn => {
+    btn.addEventListener("click", () => deleteUser(btn.dataset.username));
+  });
+
+  [...el.usersAdminBox.querySelectorAll(".admin-delete-user-sessions")].forEach(btn => {
+    btn.addEventListener("click", () => deleteUserAndSessions(btn.dataset.username));
+  });
+}
+
 function renderAdmin() {
   if (!el.analysisBox || !el.sessionsBox) return;
+  renderUsersAdmin();
   const byUser = {};
   for (const s of usageData.sessions) {
     if (!byUser[s.username]) byUser[s.username] = {sessions:0, score:0, errors:0, problems:0, plus_correct:0, plus_wrong:0, minus_correct:0, minus_wrong:0, multiply_correct:0, multiply_wrong:0, divide_correct:0, divide_wrong:0};
@@ -510,9 +612,18 @@ function randInt(min, max) {
 
 function randomProblem(settings, operationChoice) {
   const available = settings.operations;
-  const operation = operationChoice === "Wisselend"
-    ? available[randInt(0, available.length - 1)]
-    : operationChoice;
+
+  let operation;
+  if (operationChoice === "Wisselend") {
+    if (!state.operationRotation.length || state.operationRotation.join("|") !== available.join("|")) {
+      state.operationRotation = available.slice();
+      state.operationRotationIndex = 0;
+    }
+    operation = state.operationRotation[state.operationRotationIndex % state.operationRotation.length];
+    state.operationRotationIndex += 1;
+  } else {
+    operation = operationChoice;
+  }
 
   let target;
   if (operation === "+") {
@@ -849,6 +960,8 @@ function startNewGame() {
   state.inputLocked = false;
   state.timeLeft = state.settings.timerSeconds;
   state.wrongAttemptsCurrentRound = 0;
+  state.operationRotation = state.settings.operations.slice();
+  state.operationRotationIndex = 0;
   resetSessionStats();
 
   setStatus("Nieuw spel gestart.");
@@ -1032,13 +1145,14 @@ el.saveSettingsBtn.addEventListener("click", saveSettingsFromForm);
 el.addUserBtn.addEventListener("click", addUser);
 el.adminToggleBtn.addEventListener("click", () => {
   const password = prompt("Administrator wachtwoord:");
-  if (password !== "oefenen") { setStatus("Administrator toegang geweigerd."); return; }
+  if (password !== (config.Admin.password || "oefenen")) { setStatus("Administrator toegang geweigerd."); return; }
   el.adminPanel.hidden = !el.adminPanel.hidden;
   renderAdmin();
 });
 el.refreshAdminBtn.addEventListener("click", renderAdmin);
 el.exportCsvBtn.addEventListener("click", exportUsageCsv);
 el.deleteAllDataBtn.addEventListener("click", deleteAllUsageData);
+el.saveAdminPasswordBtn.addEventListener("click", saveAdminPassword);
 window.addEventListener("beforeunload", () => saveCurrentSession("pagina gesloten"));
 
 buildSelectors();

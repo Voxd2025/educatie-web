@@ -1,8 +1,6 @@
 ABACUS GitHub Pages pakket - versie met gebruikersdata
 
-naar idee van
-
-ca. 2012 ABACUS/DeBasis;  Beat The Calculator!;   Dhr. Eugen O. Visual Basic
+naar idee van ABACUS/DeBasis V3.0.1:  Beat The Calculator! - Eugen O.
 
 Bestanden:
 - index.html
@@ -37,3 +35,17 @@ Let op:
 Extra in versie 4:
 - Administrator wachtwoord aangepast naar: oefenen
 - Kolom Tijdstip toegevoegd tussen Datum en Gebruiker
+
+Extra in versie 5:
+- Bij 'Wisselend' rouleren de operaties eerlijk: +, -, ×, ÷, daarna opnieuw.
+- De analyse toont nu ook het totaal aantal gemaakte opgaven per operatie.
+- Beheer uitgebreid:
+  - administrator-wachtwoord zichtbaar en lokaal wijzigbaar
+  - gebruikersnamen zichtbaar
+  - gebruikersnamen bewerken
+  - gebruiker verwijderen
+  - gebruiker verwijderen inclusief sessies
+
+Let op:
+- Spelers hebben in deze versie nog geen wachtwoord.
+- Het administrator-wachtwoord wordt lokaal op het apparaat opgeslagen.
