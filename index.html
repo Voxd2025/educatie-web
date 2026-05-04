@@ -508,19 +508,102 @@ function renderAdmin() {
   renderUsersAdmin();
   const byUser = {};
   for (const s of usageData.sessions) {
-    if (!byUser[s.username]) byUser[s.username] = {sessions:0, score:0, errors:0, problems:0, plus_correct:0, plus_wrong:0, minus_correct:0, minus_wrong:0, multiply_correct:0, multiply_wrong:0, divide_correct:0, divide_wrong:0};
-    const u = byUser[s.username]; u.sessions++; u.score += Number(s.score||0); u.errors += Number(s.errors||0); u.problems += Number(s.total_problems||0);
-    for (const k of ["plus_correct","plus_wrong","minus_correct","minus_wrong","multiply_correct","multiply_wrong","divide_correct","divide_wrong"]) u[k] += Number(s[k]||0);
+    if (!byUser[s.username]) {
+      byUser[s.username] = {
+        sessions: 0, score: 0, errors: 0, problems: 0,
+        plus_correct: 0, plus_wrong: 0,
+        minus_correct: 0, minus_wrong: 0,
+        multiply_correct: 0, multiply_wrong: 0,
+        divide_correct: 0, divide_wrong: 0
+      };
+    }
+    const u = byUser[s.username];
+    u.sessions += 1;
+    u.score += Number(s.score || 0);
+    u.errors += Number(s.errors || 0);
+    u.problems += Number(s.total_problems || 0);
+    for (const k of ["plus_correct","plus_wrong","minus_correct","minus_wrong","multiply_correct","multiply_wrong","divide_correct","divide_wrong"]) {
+      u[k] += Number(s[k] || 0);
+    }
   }
-  const pct = (wrong, correct) => { const total = Number(wrong)+Number(correct); return total ? Math.round((Number(wrong)/total)*100)+"%" : "-"; };
-  let ah = `<table><thead><tr><th>Gebruiker</th><th>Sessies</th><th>Score</th><th>Fouten</th><th>Opgaven</th><th>+ fout%</th><th>- fout%</th><th>× fout%</th><th>÷ fout%</th></tr></thead><tbody>`;
-  for (const [username,u] of Object.entries(byUser)) ah += `<tr><td>${escapeHtml(username)}</td><td>${u.sessions}</td><td>${u.score}</td><td>${u.errors}</td><td>${u.problems}</td><td>${pct(u.plus_wrong,u.plus_correct)}</td><td>${pct(u.minus_wrong,u.minus_correct)}</td><td>${pct(u.multiply_wrong,u.multiply_correct)}</td><td>${pct(u.divide_wrong,u.divide_correct)}</td></tr>`;
-  ah += `</tbody></table>`; if (!usageData.sessions.length) ah = "<p>Nog geen sessies opgeslagen.</p>"; el.analysisBox.innerHTML = ah;
-  let sh = `<table><thead><tr><th>Datum</th><th>Tijdstip</th><th>Gebruiker</th><th>Niveau</th><th>Modus</th><th>Score</th><th>Fouten</th><th>Opgaven</th><th>Duur</th></tr></thead><tbody>`;
-  for (const s of usageData.sessions.slice().reverse().slice(0,100)) sh += `<tr><td>${escapeHtml(s.date)}</td>
+
+  const pct = (wrong, correct) => {
+    const total = Number(wrong) + Number(correct);
+    return total ? Math.round((Number(wrong) / total) * 100) + "%" : "-";
+  };
+
+  let ah = `<table><thead><tr>
+    <th>Gebruiker</th>
+    <th>Sessies</th>
+    <th>Score</th>
+    <th>Fouten</th>
+    <th>Opgaven</th>
+    <th>+ opgaven</th>
+    <th>+ fout%</th>
+    <th>- opgaven</th>
+    <th>- fout%</th>
+    <th>× opgaven</th>
+    <th>× fout%</th>
+    <th>÷ opgaven</th>
+    <th>÷ fout%</th>
+  </tr></thead><tbody>`;
+
+  for (const [username, u] of Object.entries(byUser)) {
+    const plusTotal = u.plus_correct + u.plus_wrong;
+    const minusTotal = u.minus_correct + u.minus_wrong;
+    const multiplyTotal = u.multiply_correct + u.multiply_wrong;
+    const divideTotal = u.divide_correct + u.divide_wrong;
+
+    ah += `<tr>
+      <td>${escapeHtml(username)}</td>
+      <td>${u.sessions}</td>
+      <td>${u.score}</td>
+      <td>${u.errors}</td>
+      <td>${u.problems}</td>
+      <td>${plusTotal}</td>
+      <td>${pct(u.plus_wrong, u.plus_correct)}</td>
+      <td>${minusTotal}</td>
+      <td>${pct(u.minus_wrong, u.minus_correct)}</td>
+      <td>${multiplyTotal}</td>
+      <td>${pct(u.multiply_wrong, u.multiply_correct)}</td>
+      <td>${divideTotal}</td>
+      <td>${pct(u.divide_wrong, u.divide_correct)}</td>
+    </tr>`;
+  }
+
+  ah += `</tbody></table>`;
+  if (!usageData.sessions.length) ah = "<p>Nog geen sessies opgeslagen.</p>";
+  el.analysisBox.innerHTML = ah;
+
+  let sh = `<table><thead><tr>
+    <th>Datum</th>
+    <th>Tijdstip</th>
+    <th>Gebruiker</th>
+    <th>Niveau</th>
+    <th>Modus</th>
+    <th>Score</th>
+    <th>Fouten</th>
+    <th>Opgaven</th>
+    <th>Duur</th>
+  </tr></thead><tbody>`;
+
+  for (const s of usageData.sessions.slice().reverse().slice(0,100)) {
+    sh += `<tr>
+      <td>${escapeHtml(s.date)}</td>
       <td>${new Date(s.end_time).toLocaleTimeString()}</td>
-      <td>${escapeHtml(s.username)}</td><td>${escapeHtml(s.difficulty)}</td><td>${escapeHtml(s.game_mode)}</td><td>${s.score}</td><td>${s.errors}</td><td>${s.total_problems}</td><td>${s.duration_seconds}s</td></tr>`;
-  sh += `</tbody></table>`; if (!usageData.sessions.length) sh = "<p>Nog geen sessies opgeslagen.</p>"; el.sessionsBox.innerHTML = sh;
+      <td>${escapeHtml(s.username)}</td>
+      <td>${escapeHtml(s.difficulty)}</td>
+      <td>${escapeHtml(s.game_mode)}</td>
+      <td>${s.score}</td>
+      <td>${s.errors}</td>
+      <td>${s.total_problems}</td>
+      <td>${s.duration_seconds}s</td>
+    </tr>`;
+  }
+
+  sh += `</tbody></table>`;
+  if (!usageData.sessions.length) sh = "<p>Nog geen sessies opgeslagen.</p>";
+  el.sessionsBox.innerHTML = sh;
 }
 function exportUsageCsv() {
   const headers = ["session_id","username","date","start_time","end_time","duration_seconds","difficulty","operation_mode","game_mode","score","errors","total_problems","end_reason","plus_correct","plus_wrong","minus_correct","minus_wrong","multiply_correct","multiply_wrong","divide_correct","divide_wrong"];

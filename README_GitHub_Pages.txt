@@ -49,3 +49,8 @@ Extra in versie 5:
 Let op:
 - Spelers hebben in deze versie nog geen wachtwoord.
 - Het administrator-wachtwoord wordt lokaal op het apparaat opgeslagen.
+
+Correctie in versie 6:
+- De analysetabel bevat nu daadwerkelijk de kolommen:
+  + opgaven, - opgaven, × opgaven, ÷ opgaven.
+- JavaScript-syntax gecontroleerd.
