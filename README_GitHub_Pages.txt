@@ -54,3 +54,8 @@ Correctie in versie 6:
 - De analysetabel bevat nu daadwerkelijk de kolommen:
   + opgaven, - opgaven, × opgaven, ÷ opgaven.
 - JavaScript-syntax gecontroleerd.
+
+Herstel in versie 7:
+- Startfout opgelost waardoor keuzelijsten 'No options' konden tonen.
+- Event listeners worden nu pas na het vullen van de schermen gekoppeld.
+- Backup maken en backup importeren toegevoegd voor behoud van spelersnamen, sessies en analysegeschiedenis.

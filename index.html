@@ -176,6 +176,11 @@
       <div class="admin-actions">
         <button class="secondary" id="refreshAdminBtn">Verversen</button>
         <button class="secondary" id="exportCsvBtn">CSV exporteren</button>
+        <button class="secondary" id="backupJsonBtn">Backup maken</button>
+        <label class="secondary" style="display:inline-block; width:auto; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:white; cursor:pointer;">
+          Backup importeren
+          <input id="importJsonInput" type="file" accept="application/json,.json" style="display:none;" />
+        </label>
         <button class="secondary" id="deleteAllDataBtn">Alle gebruiksdata verwijderen</button>
       </div>
       <div class="small-muted">Data wordt lokaal in deze browser opgeslagen. Bij wissen van browsergegevens kan deze data verdwijnen.</div>
@@ -346,7 +351,9 @@ const el = {
   sessionsBox: document.getElementById("sessionsBox"),
   adminPasswordInput: document.getElementById("adminPasswordInput"),
   saveAdminPasswordBtn: document.getElementById("saveAdminPasswordBtn"),
-  usersAdminBox: document.getElementById("usersAdminBox")
+  usersAdminBox: document.getElementById("usersAdminBox"),
+  backupJsonBtn: document.getElementById("backupJsonBtn"),
+  importJsonInput: document.getElementById("importJsonInput")
 };
 
 
@@ -505,7 +512,7 @@ function renderUsersAdmin() {
 
 function renderAdmin() {
   if (!el.analysisBox || !el.sessionsBox) return;
-  renderUsersAdmin();
+  if (typeof renderUsersAdmin === "function") renderUsersAdmin();
   const byUser = {};
   for (const s of usageData.sessions) {
     if (!byUser[s.username]) {
@@ -612,6 +619,55 @@ function exportUsageCsv() {
   const blob = new Blob([rows.join("\n")], {type:"text/csv;charset=utf-8"}); const url = URL.createObjectURL(blob); const a = document.createElement("a");
   a.href=url; a.download="abacus_gebruiksdata.csv"; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 }
+
+function backupUsageJson() {
+  const payload = {
+    app: "ABACUS Web",
+    backup_version: 1,
+    exported_at: new Date().toISOString(),
+    config,
+    usageData
+  };
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `abacus_backup_${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function importUsageJson(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const payload = JSON.parse(reader.result);
+      const importedUsage = payload.usageData || payload;
+      if (!importedUsage || !Array.isArray(importedUsage.users) || !Array.isArray(importedUsage.sessions)) {
+        alert("Dit is geen geldige ABACUS-backup.");
+        return;
+      }
+      const ok = confirm("Backup importeren? Huidige lokale gebruikers- en sessiedata wordt vervangen.");
+      if (!ok) return;
+      usageData = {
+        users: importedUsage.users,
+        sessions: importedUsage.sessions
+      };
+      saveUsageData();
+      renderUsers();
+      renderAdmin();
+      setStatus("Backup geïmporteerd.");
+    } catch (e) {
+      alert("Backup kon niet worden gelezen.");
+    }
+  };
+  reader.readAsText(file);
+}
+
 function deleteAllUsageData() {
   if (!confirm("Weet je zeker dat je alle gebruikers- en sessiedata wilt verwijderen? Dit kan niet ongedaan worden gemaakt.")) return;
   usageData = {users: [], sessions: []}; saveUsageData(); renderUsers(); renderAdmin(); setStatus("Alle gebruiksdata is verwijderd.");
@@ -1224,19 +1280,29 @@ el.operation.addEventListener("change", () => { state.operationChoice = el.opera
 el.mode.addEventListener("change", () => { state.mode = el.mode.value; });
 el.soundEnabled.addEventListener("change", () => { config.Sound.enabled = el.soundEnabled.value === "true"; saveConfig(); });
 el.newGameBtn.addEventListener("click", startNewGame);
-el.saveSettingsBtn.addEventListener("click", saveSettingsFromForm);
-el.addUserBtn.addEventListener("click", addUser);
-el.adminToggleBtn.addEventListener("click", () => {
-  const password = prompt("Administrator wachtwoord:");
-  if (password !== (config.Admin.password || "oefenen")) { setStatus("Administrator toegang geweigerd."); return; }
-  el.adminPanel.hidden = !el.adminPanel.hidden;
-  renderAdmin();
-});
-el.refreshAdminBtn.addEventListener("click", renderAdmin);
-el.exportCsvBtn.addEventListener("click", exportUsageCsv);
-el.deleteAllDataBtn.addEventListener("click", deleteAllUsageData);
-el.saveAdminPasswordBtn.addEventListener("click", saveAdminPassword);
-window.addEventListener("beforeunload", () => saveCurrentSession("pagina gesloten"));
+function bindEvents() {
+  el.saveSettingsBtn?.addEventListener("click", saveSettingsFromForm);
+  el.addUserBtn?.addEventListener("click", addUser);
+  el.adminToggleBtn?.addEventListener("click", () => {
+    const password = prompt("Administrator wachtwoord:");
+    if (password !== (config.Admin.password || "oefenen")) {
+      setStatus("Administrator toegang geweigerd.");
+      return;
+    }
+    el.adminPanel.hidden = !el.adminPanel.hidden;
+    renderAdmin();
+  });
+  el.refreshAdminBtn?.addEventListener("click", renderAdmin);
+  el.exportCsvBtn?.addEventListener("click", exportUsageCsv);
+  el.backupJsonBtn?.addEventListener("click", backupUsageJson);
+  el.importJsonInput?.addEventListener("change", (event) => {
+    importUsageJson(event.target.files && event.target.files[0]);
+    event.target.value = "";
+  });
+  el.deleteAllDataBtn?.addEventListener("click", deleteAllUsageData);
+  el.saveAdminPasswordBtn?.addEventListener("click", saveAdminPassword);
+  window.addEventListener("beforeunload", () => saveCurrentSession("pagina gesloten"));
+}
 
 buildSelectors();
 buildDifficultySettings();
@@ -1246,6 +1312,7 @@ renderAdmin();
 applyCurrentSettings();
 updateTexts();
 setStatus("Kies een gebruiker en klik op 'Nieuw spel' om te starten.");
+bindEvents();
 </script>
 </body>
 </html>
