@@ -151,7 +151,7 @@
       </div>
 
       <div class="problem" id="problemText">x + y = ?</div>
-      <div class="meta" id="scoreText">Score: 0</div>
+      <div class="meta" id="scoreText">Goed: 0</div>
       <div class="meta" id="statsText">Fouten: 0 | Opgaven: 0</div>
       <div class="timer" id="timerText"></div>
       <div class="status" id="statusText">Kies twee aangrenzende getallen.</div>
@@ -183,7 +183,7 @@
         </label>
         <button class="secondary" id="deleteAllDataBtn">Alle gebruiksdata verwijderen</button>
       </div>
-      <div class="small-muted">Data wordt lokaal in deze browser opgeslagen. Bij wissen van browsergegevens kan deze data verdwijnen.</div>
+      <div class="small-muted">Data wordt lokaal in deze browser opgeslagen. Maak regelmatig een JSON-backup; die kun je ook op een ander apparaat importeren.</div>
       <h4>Analyse per gebruiker en operatie</h4>
       <div id="analysisBox"></div>
       <h4>Opgeslagen sessies</h4>
@@ -250,9 +250,9 @@
 
 <script>
 const DEFAULTS = {
-  Beginner: { gridSize: 4, minValue: 0, maxValue: 5, minSolutions: 2, maxSolutions: 3, operations: ["+","-"], showNeighborsOnFirstPick: true },
-  Basis: { gridSize: 5, minValue: 0, maxValue: 9, minSolutions: 2, maxSolutions: 4, operations: ["+","-","*"], showNeighborsOnFirstPick: true },
-  Gevorderd: { gridSize: 5, minValue: 0, maxValue: 9, minSolutions: 2, maxSolutions: 4, operations: ["+","-","*"], showNeighborsOnFirstPick: true },
+  Beginner: { gridSize: 4, minValue: 0, maxValue: 5, minSolutions: 2, maxSolutions: 3, operations: ["+","-","*","/"], showNeighborsOnFirstPick: true },
+  Basis: { gridSize: 5, minValue: 0, maxValue: 9, minSolutions: 2, maxSolutions: 4, operations: ["+","-","*","/"], showNeighborsOnFirstPick: true },
+  Gevorderd: { gridSize: 5, minValue: 0, maxValue: 9, minSolutions: 2, maxSolutions: 4, operations: ["+","-","*","/"], showNeighborsOnFirstPick: true },
   Expert: { gridSize: 6, minValue: 0, maxValue: 9, minSolutions: 3, maxSolutions: 5, operations: ["+","-","*","/"], showNeighborsOnFirstPick: true },
   FreePlay: { defaultProblemLimit: 10, defaultTimerSeconds: 60 },
   Sound: { enabled: true },
@@ -260,9 +260,9 @@ const DEFAULTS = {
 };
 
 const DIFFICULTY_INFO = {
-  Beginner: "BEGINNER | 4×4 | 0 t/m 5 | Operaties: + en − | Oplossingen via instellingen zichtbaar",
-  Basis: "BASIS | 5×5 | 0 t/m 9 | Operaties: +, − en ×",
-  Gevorderd: "GEVORDERD | 5×5 | 0 t/m 9 | Operaties: +, − en ×",
+  Beginner: "BEGINNER | 4×4 | 0 t/m 5 | Operaties: +, −, × en ÷ | Oplossingen via instellingen zichtbaar",
+  Basis: "BASIS | 5×5 | 0 t/m 9 | Operaties: +, −, × en ÷",
+  Gevorderd: "GEVORDERD | 5×5 | 0 t/m 9 | Operaties: +, −, × en ÷",
   Expert: "EXPERT | 6×6 | 0 t/m 9 | Operaties: +, −, × en ÷"
 };
 
@@ -295,6 +295,7 @@ const state = {
   score: 0,
   errors: 0,
   roundsPlayed: 0,
+  answeredProblems: 0,
   selectedCells: [],
   currentProblem: null,
   gridValues: [],
@@ -542,9 +543,9 @@ function renderAdmin() {
   let ah = `<table><thead><tr>
     <th>Gebruiker</th>
     <th>Sessies</th>
-    <th>Score</th>
-    <th>Fouten</th>
-    <th>Opgaven</th>
+    <th>Goed</th>
+    <th>Fout</th>
+    <th>Beantwoord</th>
     <th>+ opgaven</th>
     <th>+ fout%</th>
     <th>- opgaven</th>
@@ -588,9 +589,9 @@ function renderAdmin() {
     <th>Gebruiker</th>
     <th>Niveau</th>
     <th>Modus</th>
-    <th>Score</th>
-    <th>Fouten</th>
-    <th>Opgaven</th>
+    <th>Goed</th>
+    <th>Fout</th>
+    <th>Beantwoord</th>
     <th>Duur</th>
   </tr></thead><tbody>`;
 
@@ -932,12 +933,12 @@ function updateModeOptions() {
 }
 
 function updateTexts() {
-  el.scoreText.textContent = `Score: ${state.score}`;
-  el.statsText.textContent = `Fouten: ${state.errors} | Opgaven: ${state.roundsPlayed}`;
+  el.scoreText.textContent = `Goed: ${state.score}`;
+  el.statsText.textContent = `Foutpogingen: ${state.errors} | Beantwoord: ${state.answeredProblems}`;
   el.problemText.textContent = state.currentProblem ? problemDisplay(state.currentProblem) : "x + y = ?";
   el.difficultyInfo.textContent = `${DIFFICULTY_INFO[state.difficulty]} | Actief min_solutions=${state.settings.minSolutions}, max_solutions=${state.settings.maxSolutions}`;
   if (state.settings.timerSeconds !== null) el.timerText.textContent = `⏱️ Tijd over: ${state.timeLeft} sec`;
-  else if (state.settings.problemLimit !== null) el.timerText.textContent = `📊 Opgaven: ${state.roundsPlayed}/${state.settings.problemLimit}`;
+  else if (state.settings.problemLimit !== null) el.timerText.textContent = `📊 Beantwoord: ${state.answeredProblems}/${state.settings.problemLimit}`;
   else el.timerText.textContent = "";
 }
 
@@ -1048,7 +1049,7 @@ function tickTimer() {
 function startNewRound() {
   if (state.gameOver) return;
 
-  if (state.settings.problemLimit !== null && state.roundsPlayed >= state.settings.problemLimit) {
+  if (state.settings.problemLimit !== null && state.answeredProblems >= state.settings.problemLimit) {
     finishGame("Doel bereikt. Einde spel.", "limit");
     return;
   }
@@ -1092,6 +1093,7 @@ function startNewGame() {
   state.score = 0;
   state.errors = 0;
   state.roundsPlayed = 0;
+  state.answeredProblems = 0;
   state.selectedCells = [];
   state.currentProblem = null;
   state.gridValues = [];
@@ -1114,6 +1116,7 @@ function startNewGame() {
 
 function handleWrong(reason="Onjuiste combinatie.", showSolutionsNow=false) {
   recordOperationResult(state.currentProblem.operation, false);
+  state.answeredProblems += 1;
   state.errors += 1;
   state.wrongAttemptsCurrentRound += 1;
   updateTexts();
@@ -1148,6 +1151,7 @@ function handleWrong(reason="Onjuiste combinatie.", showSolutionsNow=false) {
 
 function handleCorrect() {
   recordOperationResult(state.currentProblem.operation, true);
+  state.answeredProblems += 1;
   state.score += 1;
   updateTexts();
   markCells(state.selectedCells, "correct");

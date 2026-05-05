@@ -59,3 +59,10 @@ Herstel in versie 7:
 - Startfout opgelost waardoor keuzelijsten 'No options' konden tonen.
 - Event listeners worden nu pas na het vullen van de schermen gekoppeld.
 - Backup maken en backup importeren toegevoegd voor behoud van spelersnamen, sessies en analysegeschiedenis.
+
+Aanpassing in versie 8:
+- Bij alle moeilijkheidsgraden zijn nu alle bewerkingen actief en selecteerbaar: +, -, ×, ÷.
+- Het label 'Score' is gewijzigd naar 'Goed'.
+- 'Beantwoord' telt nu goede antwoorden plus foutpogingen.
+- Sessieopslag gebruikt nu 'Beantwoord' in plaats van aangemaakte/gestarte opgaven.
+- Backup/import gebruikt JSON en is bedoeld voor volledige app-data: gebruikers, sessies, analyses en instellingen.
