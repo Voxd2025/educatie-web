@@ -184,6 +184,17 @@
         <button class="secondary" id="deleteAllDataBtn">Alle gebruiksdata verwijderen</button>
       </div>
       <div class="small-muted">Data wordt lokaal in deze browser opgeslagen. Maak regelmatig een JSON-backup; die kun je ook op een ander apparaat importeren.</div>
+      <h4>Gebruikers en administrator-wachtwoord</h4>
+      <div style="display:grid; gap:10px; max-width:760px;">
+        <div>
+          <label for="adminPasswordInput">Administrator-wachtwoord</label>
+          <input id="adminPasswordInput" type="text" />
+        </div>
+        <button class="secondary" id="saveAdminPasswordBtn">Administrator-wachtwoord bewaren</button>
+        <div class="small-muted">Hier kun je het administrator-wachtwoord zien en wijzigen. Standaard is dit: oefenen.</div>
+        <div id="usersAdminBox"></div>
+      </div>
+
       <h4>Analyse per gebruiker en operatie</h4>
       <div id="analysisBox"></div>
       <h4>Opgeslagen sessies</h4>
@@ -291,7 +302,8 @@ function saveConfig() {
 
 let config = loadConfig();
 
-function normalizeConfigForV9() {
+
+function normalizeConfigForV10() {
   const allOps = ["+","-","*","/"];
   for (const diff of ["Beginner","Basis","Gevorderd","Expert"]) {
     if (!config[diff]) config[diff] = structuredClone(DEFAULTS[diff]);
@@ -300,7 +312,8 @@ function normalizeConfigForV9() {
   if (!config.Admin) config.Admin = { password: "oefenen" };
   saveConfig();
 }
-normalizeConfigForV9();
+normalizeConfigForV10();
+
 
 
 const state = {
@@ -540,6 +553,7 @@ function renderUsersAdmin() {
 function renderAdmin() {
   if (!el.analysisBox || !el.sessionsBox) return;
   if (typeof renderUsersAdmin === "function") renderUsersAdmin();
+
   const byUser = {};
   for (const s of usageData.sessions) {
     if (!byUser[s.username]) {
@@ -567,19 +581,9 @@ function renderAdmin() {
   };
 
   let ah = `<table><thead><tr>
-    <th>Gebruiker</th>
-    <th>Sessies</th>
-    <th>Goed</th>
-    <th>Fout</th>
-    <th>Beantwoord</th>
-    <th>+ opgaven</th>
-    <th>+ fout%</th>
-    <th>- opgaven</th>
-    <th>- fout%</th>
-    <th>× opgaven</th>
-    <th>× fout%</th>
-    <th>÷ opgaven</th>
-    <th>÷ fout%</th>
+    <th>Gebruiker</th><th>Sessies</th><th>Goed</th><th>Fout</th><th>Beantwoord</th>
+    <th>+ opgaven</th><th>+ fout%</th><th>- opgaven</th><th>- fout%</th>
+    <th>× opgaven</th><th>× fout%</th><th>÷ opgaven</th><th>÷ fout%</th>
   </tr></thead><tbody>`;
 
   for (const [username, u] of Object.entries(byUser)) {
@@ -587,21 +591,12 @@ function renderAdmin() {
     const minusTotal = u.minus_correct + u.minus_wrong;
     const multiplyTotal = u.multiply_correct + u.multiply_wrong;
     const divideTotal = u.divide_correct + u.divide_wrong;
-
     ah += `<tr>
-      <td>${escapeHtml(username)}</td>
-      <td>${u.sessions}</td>
-      <td>${u.score}</td>
-      <td>${u.errors}</td>
-      <td>${u.problems}</td>
-      <td>${plusTotal}</td>
-      <td>${pct(u.plus_wrong, u.plus_correct)}</td>
-      <td>${minusTotal}</td>
-      <td>${pct(u.minus_wrong, u.minus_correct)}</td>
-      <td>${multiplyTotal}</td>
-      <td>${pct(u.multiply_wrong, u.multiply_correct)}</td>
-      <td>${divideTotal}</td>
-      <td>${pct(u.divide_wrong, u.divide_correct)}</td>
+      <td>${escapeHtml(username)}</td><td>${u.sessions}</td><td>${u.score}</td><td>${u.errors}</td><td>${u.problems}</td>
+      <td>${plusTotal}</td><td>${pct(u.plus_wrong, u.plus_correct)}</td>
+      <td>${minusTotal}</td><td>${pct(u.minus_wrong, u.minus_correct)}</td>
+      <td>${multiplyTotal}</td><td>${pct(u.multiply_wrong, u.multiply_correct)}</td>
+      <td>${divideTotal}</td><td>${pct(u.divide_wrong, u.divide_correct)}</td>
     </tr>`;
   }
 
@@ -610,27 +605,15 @@ function renderAdmin() {
   el.analysisBox.innerHTML = ah;
 
   let sh = `<table><thead><tr>
-    <th>Datum</th>
-    <th>Tijdstip</th>
-    <th>Gebruiker</th>
-    <th>Niveau</th>
-    <th>Modus</th>
-    <th>Goed</th>
-    <th>Fout</th>
-    <th>Beantwoord</th>
-    <th>Duur</th>
+    <th>Datum</th><th>Tijdstip</th><th>Gebruiker</th><th>Niveau</th><th>Modus</th>
+    <th>Goed</th><th>Fout</th><th>Beantwoord</th><th>Duur</th>
   </tr></thead><tbody>`;
 
   for (const s of usageData.sessions.slice().reverse().slice(0,100)) {
     sh += `<tr>
-      <td>${escapeHtml(s.date)}</td>
-      <td>${new Date(s.end_time).toLocaleTimeString()}</td>
-      <td>${escapeHtml(s.username)}</td>
-      <td>${escapeHtml(s.difficulty)}</td>
-      <td>${escapeHtml(s.game_mode)}</td>
-      <td>${sessionCorrectTotal(s)}</td>
-      <td>${sessionWrongTotal(s)}</td>
-      <td>${sessionAnsweredTotal(s)}</td>
+      <td>${escapeHtml(s.date)}</td><td>${s.end_time ? new Date(s.end_time).toLocaleTimeString() : ""}</td>
+      <td>${escapeHtml(s.username)}</td><td>${escapeHtml(s.difficulty)}</td><td>${escapeHtml(s.game_mode)}</td>
+      <td>${sessionCorrectTotal(s)}</td><td>${sessionWrongTotal(s)}</td><td>${sessionAnsweredTotal(s)}</td>
       <td>${s.duration_seconds}s</td>
     </tr>`;
   }
