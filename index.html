@@ -291,6 +291,18 @@ function saveConfig() {
 
 let config = loadConfig();
 
+function normalizeConfigForV9() {
+  const allOps = ["+","-","*","/"];
+  for (const diff of ["Beginner","Basis","Gevorderd","Expert"]) {
+    if (!config[diff]) config[diff] = structuredClone(DEFAULTS[diff]);
+    config[diff].operations = allOps.slice();
+  }
+  if (!config.Admin) config.Admin = { password: "oefenen" };
+  saveConfig();
+}
+normalizeConfigForV9();
+
+
 const state = {
   score: 0,
   errors: 0,
@@ -416,6 +428,20 @@ function saveCurrentSession(reason="afgesloten") {
   };
   usageData.sessions.push(session); saveUsageData(); state.sessionSaved = true; renderAdmin();
 }
+
+function sessionCorrectTotal(s) {
+  return Number(s.plus_correct || 0) + Number(s.minus_correct || 0) + Number(s.multiply_correct || 0) + Number(s.divide_correct || 0);
+}
+
+function sessionWrongTotal(s) {
+  return Number(s.plus_wrong || 0) + Number(s.minus_wrong || 0) + Number(s.multiply_wrong || 0) + Number(s.divide_wrong || 0);
+}
+
+function sessionAnsweredTotal(s) {
+  const byOps = sessionCorrectTotal(s) + sessionWrongTotal(s);
+  return byOps > 0 ? byOps : Number(s.total_problems || 0);
+}
+
 function escapeHtml(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
 function renameUser(oldName, newName) {
@@ -527,9 +553,9 @@ function renderAdmin() {
     }
     const u = byUser[s.username];
     u.sessions += 1;
-    u.score += Number(s.score || 0);
-    u.errors += Number(s.errors || 0);
-    u.problems += Number(s.total_problems || 0);
+    u.score += sessionCorrectTotal(s);
+    u.errors += sessionWrongTotal(s);
+    u.problems += sessionAnsweredTotal(s);
     for (const k of ["plus_correct","plus_wrong","minus_correct","minus_wrong","multiply_correct","multiply_wrong","divide_correct","divide_wrong"]) {
       u[k] += Number(s[k] || 0);
     }
@@ -602,9 +628,9 @@ function renderAdmin() {
       <td>${escapeHtml(s.username)}</td>
       <td>${escapeHtml(s.difficulty)}</td>
       <td>${escapeHtml(s.game_mode)}</td>
-      <td>${s.score}</td>
-      <td>${s.errors}</td>
-      <td>${s.total_problems}</td>
+      <td>${sessionCorrectTotal(s)}</td>
+      <td>${sessionWrongTotal(s)}</td>
+      <td>${sessionAnsweredTotal(s)}</td>
       <td>${s.duration_seconds}s</td>
     </tr>`;
   }
@@ -614,11 +640,31 @@ function renderAdmin() {
   el.sessionsBox.innerHTML = sh;
 }
 function exportUsageCsv() {
-  const headers = ["session_id","username","date","start_time","end_time","duration_seconds","difficulty","operation_mode","game_mode","score","errors","total_problems","end_reason","plus_correct","plus_wrong","minus_correct","minus_wrong","multiply_correct","multiply_wrong","divide_correct","divide_wrong"];
+  const headers = [
+    "session_id","username","date","time","start_time","end_time","duration_seconds","difficulty","operation_mode","game_mode",
+    "goed","fout","beantwoord","end_reason",
+    "plus_correct","plus_wrong","minus_correct","minus_wrong","multiply_correct","multiply_wrong","divide_correct","divide_wrong"
+  ];
   const rows = [headers.join(",")];
-  for (const s of usageData.sessions) rows.push(headers.map(h => `"${String(s[h] ?? "").replace(/"/g, '""')}"`).join(","));
-  const blob = new Blob([rows.join("\n")], {type:"text/csv;charset=utf-8"}); const url = URL.createObjectURL(blob); const a = document.createElement("a");
-  a.href=url; a.download="abacus_gebruiksdata.csv"; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  for (const s of usageData.sessions) {
+    const row = {
+      ...s,
+      time: s.end_time ? new Date(s.end_time).toLocaleTimeString() : "",
+      goed: sessionCorrectTotal(s),
+      fout: sessionWrongTotal(s),
+      beantwoord: sessionAnsweredTotal(s)
+    };
+    rows.push(headers.map(h => `"${String(row[h] ?? "").replace(/"/g, '""')}"`).join(","));
+  }
+  const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "abacus_gebruiksdata.csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 function backupUsageJson() {
@@ -1231,6 +1277,7 @@ function buildSelectors() {
 function buildDifficultySettings() {
   el.difficultySettings.innerHTML = "";
   for (const diff of ["Beginner","Basis","Gevorderd","Expert"]) {
+    config[diff].operations = ["+","-","*","/"];
     const box = document.createElement("div");
     box.className = "card";
     box.innerHTML = `

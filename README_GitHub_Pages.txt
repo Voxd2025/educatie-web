@@ -1,11 +1,11 @@
 ABACUS GitHub Pages pakket - versie met gebruikersdata
 
-naar idee van ABACUS/DeBasis V3.0.1:  Beat The Calculator! - Eugen O.
-
 Bestanden:
 - index.html
 - .nojekyll
 - README_GitHub_Pages.txt
+
+naar idee van ABACUS/DeBasis V3.0.1:  Beat The Calculator! - Eugen O.
 
 Upload naar GitHub:
 1. Open je repository educatie-web.
@@ -66,3 +66,11 @@ Aanpassing in versie 8:
 - 'Beantwoord' telt nu goede antwoorden plus foutpogingen.
 - Sessieopslag gebruikt nu 'Beantwoord' in plaats van aangemaakte/gestarte opgaven.
 - Backup/import gebruikt JSON en is bedoeld voor volledige app-data: gebruikers, sessies, analyses en instellingen.
+
+Herstel in versie 9:
+- Oude browserinstellingen worden automatisch gemigreerd naar alle vier bewerkingen voor alle moeilijkheidsgraden.
+- Daardoor tonen Basis en Gevorderd nu ook ÷, ook als localStorage nog oude instellingen bevatte.
+- Analyse gebruikt voortaan de som van goed/fout per operatie als bron voor Goed, Fout en Beantwoord.
+- Opgeslagen sessies tonen berekende waarden.
+- CSV-export bevat expliciete kolommen: goed, fout en beantwoord.
+- Beheerlocatie administrator-wachtwoord verduidelijkt.
